@@ -1,0 +1,394 @@
+/* ============ Design Tokens ============ */
+:host {
+  --bg-primary: rgba(15, 15, 25, 0.92);
+  --bg-secondary: rgba(30, 30, 45, 0.95);
+  --bg-hover: rgba(255, 255, 255, 0.08);
+  --bg-active: rgba(99, 102, 241, 0.25);
+  --accent: #818cf8;
+  --accent-glow: #6366f1;
+  --accent-bright: #a5b4fc;
+  --text-primary: #f1f5f9;
+  --text-secondary: #94a3b8;
+  --text-muted: #64748b;
+  --divider: rgba(255, 255, 255, 0.08);
+  --border: rgba(255, 255, 255, 0.1);
+  --shadow: 0 8px 32px rgba(0, 0, 0, 0.5), 0 2px 8px rgba(0, 0, 0, 0.3);
+  --shadow-hover: 0 12px 40px rgba(0, 0, 0, 0.6);
+  --blur: blur(24px);
+  --radius: 16px;
+  --radius-sm: 10px;
+  --btn-size: 42px;
+  --transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-fast: all 0.15s ease;
+}
+
+/* ============ Container ============ */
+.pdfed-toolbar-wrapper {
+  position: fixed;
+  z-index: 2147483647;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Inter', sans-serif;
+  font-size: 13px;
+  line-height: 1.4;
+  -webkit-font-smoothing: antialiased;
+  opacity: 0;
+  transform: translateY(-10px);
+  transition: opacity 0.3s ease, transform 0.3s ease;
+}
+
+.pdfed-toolbar-wrapper.pdfed-visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.pdfed-toolbar-wrapper.pdfed-hidden {
+  opacity: 0;
+  transform: translateY(-10px);
+  pointer-events: none;
+}
+
+/* ============ Main Toolbar ============ */
+.pdfed-toolbar {
+  position: fixed;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-primary);
+  backdrop-filter: var(--blur);
+  -webkit-backdrop-filter: var(--blur);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  /* overflow: hidden; Removed to allow Pages Drawer extension */
+  min-width: 480px;
+  transition: box-shadow 0.2s ease;
+}
+
+.pdfed-toolbar:hover {
+  box-shadow: var(--shadow-hover);
+}
+
+.pdfed-toolbar.dragging {
+  opacity: 0.9;
+  cursor: grabbing;
+}
+
+/* ============ Header ============ */
+.pdfed-toolbar-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.04) 0%, transparent 100%);
+  border-bottom: 1px solid var(--divider);
+  cursor: grab;
+  user-select: none;
+}
+
+.pdfed-logo {
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: -0.5px;
+  background: linear-gradient(135deg, var(--accent-bright) 0%, var(--accent) 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.pdfed-close-btn {
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: none;
+  border-radius: 6px;
+  color: var(--text-secondary);
+  font-size: 18px;
+  cursor: pointer;
+  transition: var(--transition-fast);
+}
+
+.pdfed-close-btn:hover {
+  background: rgba(239, 68, 68, 0.2);
+  color: #f87171;
+}
+
+/* ============ Toolbar Body ============ */
+.pdfed-toolbar-body {
+  display: flex;
+  align-items: center;
+  padding: 8px 10px;
+  gap: 6px;
+}
+
+/* ============ Tool Groups ============ */
+.pdfed-tool-group {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.pdfed-divider {
+  width: 1px;
+  height: 28px;
+  background: var(--divider);
+  margin: 0 6px;
+}
+
+/* ============ Tool Buttons ============ */
+.pdfed-tool-btn {
+  width: var(--btn-size);
+  height: var(--btn-size);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  background: transparent;
+  border: none;
+  border-radius: var(--radius-sm);
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: var(--transition);
+  position: relative;
+}
+
+.pdfed-tool-btn:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.pdfed-tool-btn:active {
+  transform: scale(0.95);
+}
+
+.pdfed-tool-btn.active {
+  background: var(--bg-active);
+  color: var(--accent-bright);
+}
+
+.pdfed-tool-btn.active::after {
+  content: '';
+  position: absolute;
+  bottom: 2px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 16px;
+  height: 2px;
+  background: var(--accent);
+  border-radius: 1px;
+}
+
+/* Tool Icon */
+.pdfed-tool-icon {
+  width: 20px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.pdfed-tool-icon svg {
+  width: 18px;
+  height: 18px;
+  stroke: currentColor;
+  stroke-width: 1.75;
+  fill: none;
+}
+
+/* Tool Label (shown on hover via tooltip) */
+.pdfed-tool-label {
+  display: none;
+}
+
+/* ============ Tooltips ============ */
+.pdfed-tool-btn::before {
+  content: attr(data-tooltip);
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 50%;
+  transform: translateX(-50%) translateY(4px);
+  padding: 6px 10px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text-primary);
+  font-size: 11px;
+  font-weight: 500;
+  white-space: nowrap;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.15s, transform 0.15s;
+  pointer-events: none;
+  z-index: 100;
+}
+
+.pdfed-tool-btn:hover::before {
+  opacity: 1;
+  visibility: visible;
+  transform: translateX(-50%) translateY(0);
+}
+
+/* Active button indicator handled above */
+
+/* ============ Property Panel ============ */
+.pdfed-property-panel {
+  padding: 12px 14px;
+  border-top: 1px solid var(--divider);
+  background: rgba(0, 0, 0, 0.2);
+}
+
+.pdfed-props {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+
+.pdfed-props:last-child {
+  margin-bottom: 0;
+}
+
+.pdfed-props label {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--text-secondary);
+  min-width: 70px;
+}
+
+/* Range Input */
+.pdfed-props input[type="range"] {
+  flex: 1;
+  height: 4px;
+  background: var(--divider);
+  border-radius: 2px;
+  appearance: none;
+  cursor: pointer;
+}
+
+.pdfed-props input[type="range"]::-webkit-slider-thumb {
+  appearance: none;
+  width: 14px;
+  height: 14px;
+  background: var(--accent);
+  border-radius: 50%;
+  cursor: pointer;
+  transition: transform 0.15s;
+}
+
+.pdfed-props input[type="range"]::-webkit-slider-thumb:hover {
+  transform: scale(1.2);
+}
+
+/* Color Input */
+.pdfed-props input[type="color"] {
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 2px solid var(--border);
+  border-radius: 6px;
+  cursor: pointer;
+  background: transparent;
+}
+
+.pdfed-props input[type="color"]::-webkit-color-swatch-wrapper {
+  padding: 2px;
+}
+
+.pdfed-props input[type="color"]::-webkit-color-swatch {
+  border-radius: 4px;
+  border: none;
+}
+
+.pdfed-props span {
+  font-size: 11px;
+  color: var(--text-muted);
+  min-width: 36px;
+  text-align: right;
+}
+
+/* ============ Shortcut Hint ============ */
+.pdfed-shortcut {
+  font-size: 10px;
+  color: var(--text-muted);
+  background: rgba(255, 255, 255, 0.05);
+  padding: 2px 5px;
+  border-radius: 4px;
+  margin-left: 6px;
+}
+
+/* ============ Action Buttons (Save, Undo, Redo) ============ */
+.pdfed-tool-group[data-group="actions"] .pdfed-tool-btn {
+  width: 36px;
+  height: 36px;
+}
+
+.pdfed-tool-group[data-group="actions"] .pdfed-tool-icon svg {
+  width: 16px;
+  height: 16px;
+}
+
+/* Save button special styling */
+.pdfed-tool-btn[data-tool="save"] {
+  background: linear-gradient(135deg, var(--accent-glow) 0%, var(--accent) 100%);
+  color: white;
+}
+
+.pdfed-tool-btn[data-tool="save"]:hover {
+  filter: brightness(1.1);
+  box-shadow: 0 0 20px rgba(99, 102, 241, 0.4);
+}
+
+/* ============ Animations ============ */
+@keyframes pulse {
+
+  0%,
+  100% {
+    transform: scale(1);
+  }
+
+  50% {
+    transform: scale(1.05);
+  }
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+/* ============ Responsive ============ */
+@media (max-width: 600px) {
+  .pdfed-toolbar {
+    min-width: auto;
+    max-width: calc(100vw - 40px);
+  }
+
+  .pdfed-toolbar-body {
+    flex-wrap: wrap;
+  }
+}
+
+/* ============ Accessibility ============ */
+@media (prefers-reduced-motion: reduce) {
+
+  *,
+  *::before,
+  *::after {
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+  }
+}
+
+@media (prefers-contrast: high) {
+  :host {
+    --bg-primary: rgba(0, 0, 0, 0.98);
+    --border: rgba(255, 255, 255, 0.3);
+    --text-primary: #ffffff;
+  }
+}

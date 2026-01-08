@@ -1,0 +1,60 @@
+{
+  "manifest_version": 3,
+  "name": "pdfed - PDF Editor",
+  "version": "1.0.0",
+  "description": "Edit, sign, and annotate PDFs directly in your browser. Free professional PDF editing tools.",
+  "icons": {
+    "16": "assets/icons/icon16.png",
+    "48": "assets/icons/icon48.png",
+    "128": "assets/icons/icon128.png"
+  },
+  "action": {
+    "default_icon": {
+      "16": "assets/icons/icon16.png",
+      "48": "assets/icons/icon48.png"
+    },
+    "default_title": "pdfed - Edit this PDF"
+  },
+  "permissions": [
+    "activeTab",
+    "storage",
+    "scripting"
+  ],
+  "host_permissions": [
+    "<all_urls>",
+    "file:///*"
+  ],
+  "background": {
+    "service_worker": "background/service-worker.js",
+    "type": "module"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "*://*/*.pdf",
+        "*://*/*.pdf?*",
+        "file://*/*.pdf"
+      ],
+      "js": [
+        "content/index.js"
+      ],
+      "css": [
+        "styles/toolbar.css"
+      ],
+      "run_at": "document_idle"
+    }
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": [
+        "toolbar/*",
+        "assets/*",
+        "styles/*",
+        "lib/pdf.worker.min.js"
+      ],
+      "matches": [
+        "<all_urls>"
+      ]
+    }
+  ]
+}
