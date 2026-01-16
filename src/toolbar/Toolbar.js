@@ -3,6 +3,9 @@ import { PDFEngine } from "../core/PDFEngine.js";
 import { PDFViewer } from "../core/PDFViewer.js";
 import { CanvasLayer } from "../core/CanvasLayer.js";
 import { TextTool } from "./tools/TextTool.js";
+import { getOCRService, PageType, OCRTextLayer } from "../ocr/index.js";
+import { getOCRModal } from "../ui/OCRProgressModal.js";
+import { getOCROptionsModal } from "../ui/OCROptionsModal.js";
 import { SignatureModal } from "./SignatureModal.js";
 import { StampModal } from "./StampModal.js";
 import { PageOrganizer } from "./PageOrganizer.js";
@@ -48,6 +51,7 @@ const ICONS = {
   redact:
     '<svg viewBox="0 0 24 24"><rect x="3" y="6" width="18" height="12" rx="1" fill="currentColor"/><line x1="7" y1="12" x2="17" y2="12" stroke="#fff" stroke-width="2"/></svg>',
   lock: '<svg viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>',
+  ocr: '<svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><circle cx="11" cy="13" r="3" fill="none" stroke="#fff"/><line x1="21" y1="21" x2="16" y2="16" stroke="#fff" stroke-width="2"/></svg>',
 };
 
 // Tool definitions with shortcuts
@@ -185,6 +189,13 @@ const TOOLS = {
     shortcut: "⌘S",
     group: "actions",
   },
+  ocr: {
+    id: "ocr",
+    icon: ICONS.ocr,
+    label: "OCR",
+    shortcut: "O",
+    group: "actions",
+  },
 };
 
 // Streamlined tool groups
@@ -195,7 +206,7 @@ const TOOL_GROUPS = [
   { id: "sign", tools: ["signature", "stamp"] },
   {
     id: "actions",
-    tools: ["pages", "watermark", "headfoot", "lock", "undo", "redo", "save"],
+    tools: ["ocr", "pages", "watermark", "headfoot", "lock", "undo", "redo", "save"],
   },
 ];
 
@@ -448,6 +459,9 @@ export class Toolbar {
         return;
       case "save":
         this._handleSave();
+        return;
+      case "ocr":
+        this._handleOCR();
         return;
       case "image":
         const input = this.container.querySelector("#pdfed-image-input");
@@ -761,7 +775,6 @@ export class Toolbar {
       await this.engine.reset();
 
       // 2. Re-apply ALL visual annotations from CanvasLayer
-      // This ensures moves, deletes, and undos are correctly reflected
       if (this.canvasLayer) {
         const annotations = this.canvasLayer.getAnnotations();
         console.log(`pdfed: Re-applying ${annotations.length} annotations...`);
@@ -781,7 +794,23 @@ export class Toolbar {
         }
       }
 
-      // 3. Save with Form Values
+      // 3. Apply OCR text edits
+      if (this.ocrTextLayers && this.ocrTextLayers.size > 0) {
+        console.log(`pdfed: Applying OCR edits from ${this.ocrTextLayers.size} pages...`);
+        
+        for (const [pageNum, textLayer] of this.ocrTextLayers) {
+          const edits = textLayer.getEdits();
+          if (edits.length > 0) {
+            console.log(`pdfed: Page ${pageNum}: ${edits.length} text edits`);
+            
+            for (const edit of edits) {
+              await this._applyOCREditToEngine(pageNum, edit);
+            }
+          }
+        }
+      }
+
+      // 4. Save with Form Values
       let formValues = null;
       if (this.pdfViewer && this.pdfViewer.getFormValues) {
         formValues = this.pdfViewer.getFormValues();
@@ -794,6 +823,300 @@ export class Toolbar {
       console.error("pdfed: Save failed:", error);
       alert("Failed to save PDF. Please try again.");
     }
+  }
+
+  /**
+   * Apply an OCR text edit to the PDF engine
+   * @param {number} pageNum - Page number
+   * @param {Object} edit - Edit object with original, edited, bounds
+   */
+  async _applyOCREditToEngine(pageNum, edit) {
+    if (!this.engine || !this.engine.pdfLibDoc) return;
+    
+    const { original, edited, bounds } = edit;
+    
+    // Skip if no actual change
+    if (original === edited) return;
+    
+    try {
+      // Get PDF page dimensions
+      const pdfPage = this.engine.pdfLibDoc.getPage(pageNum - 1);
+      const pdfWidth = pdfPage.getWidth();
+      const pdfHeight = pdfPage.getHeight();
+      
+      // Get OCR canvas dimensions from stored layer
+      const textLayer = this.ocrTextLayers?.get(pageNum);
+      const ocrWidth = textLayer?.canvasWidth || 918;  // Fallback to typical values
+      const ocrHeight = textLayer?.canvasHeight || 1188;
+      
+      // Calculate scale factors (OCR canvas -> PDF page)
+      const scaleX = pdfWidth / ocrWidth;
+      const scaleY = pdfHeight / ocrHeight;
+      
+      // Scale bounds from OCR canvas to PDF coordinates
+      const scaledBounds = {
+        x: bounds.x * scaleX,
+        y: bounds.y * scaleY,
+        width: bounds.width * scaleX,
+        height: bounds.height * scaleY
+      };
+      
+      console.log(`pdfed: Scaling OCR edit - PDF: ${pdfWidth}x${pdfHeight}, OCR: ${ocrWidth}x${ocrHeight}, scale: ${scaleX.toFixed(3)}x${scaleY.toFixed(3)}`);
+      
+      // Use the engine's text replacement capability
+      await this.engine.addTextAnnotation(pageNum, {
+        text: edited,
+        x: scaledBounds.x,
+        y: scaledBounds.y,
+        width: scaledBounds.width,
+        height: scaledBounds.height,
+        fontSize: Math.round(scaledBounds.height * 0.75),
+        fontFamily: 'Helvetica',
+        color: { r: 0, g: 0, b: 0 },
+        backgroundColor: { r: 255, g: 255, b: 255 },
+      });
+      
+      console.log(`pdfed: Applied OCR edit: "${original}" → "${edited}" at (${scaledBounds.x.toFixed(1)}, ${scaledBounds.y.toFixed(1)})`);
+    } catch (error) {
+      console.error(`pdfed: Failed to apply OCR edit:`, error);
+    }
+  }
+
+  /**
+   * Handle OCR processing for scanned pages
+   */
+  async _handleOCR() {
+    if (!this.pdfViewer || !this.pdfViewer.pdfDoc) {
+      alert("Please load a PDF first.");
+      return;
+    }
+
+    const ocrService = getOCRService();
+    const optionsModal = getOCROptionsModal();
+    const progressModal = getOCRModal();
+    
+    // Step 1: Show options modal and get user preferences
+    let options;
+    try {
+      options = await optionsModal.show({
+        forceOCR: false,
+        language: 'eng'
+      });
+    } catch (e) {
+      // User cancelled
+      return;
+    }
+
+    // Set language
+    await ocrService.setLanguage(options.language);
+
+    let cancelled = false;
+    progressModal.onCancel(() => {
+      cancelled = true;
+      ocrService.terminate();
+    });
+
+    try {
+      const numPages = this.pdfViewer.pdfDoc.numPages;
+      const pagesToProcess = [];
+
+      // Step 2: Analyze pages (or use all pages if Force OCR)
+      progressModal.show({ status: "Analyzing document...", progress: 0 });
+
+      for (let i = 1; i <= numPages; i++) {
+        if (cancelled) return;
+        
+        if (options.forceOCR) {
+          // Force OCR: process all pages
+          pagesToProcess.push(i);
+        } else {
+          // Normal mode: only scanned pages
+          const page = await this.pdfViewer.pdfDoc.getPage(i);
+          const pageType = await ocrService.analyzePage(page, i);
+          
+          if (pageType === PageType.SCANNED || pageType === PageType.MIXED) {
+            pagesToProcess.push(i);
+          }
+        }
+        
+        progressModal.setProgress(i / numPages * 0.2);
+      }
+
+      if (pagesToProcess.length === 0) {
+        progressModal.setStatus("No scanned pages detected!");
+        progressModal.setProgress(1);
+        setTimeout(() => progressModal.hide(), 2000);
+        return;
+      }
+
+      // Phase 2: Process pages with OCR
+      progressModal.setStatus(`Processing ${pagesToProcess.length} page(s)...`);
+      
+      ocrService.onProgress((pageNum, progress) => {
+        const pageIndex = pagesToProcess.indexOf(pageNum);
+        const overallProgress = 0.2 + (pageIndex + progress) / pagesToProcess.length * 0.8;
+        progressModal.setProgress(overallProgress);
+      });
+
+      for (let i = 0; i < pagesToProcess.length; i++) {
+        if (cancelled) return;
+        
+        const pageNum = pagesToProcess[i];
+        progressModal.setPage(pageNum, numPages);
+        progressModal.setStatus(`OCR processing page ${pageNum}...`);
+
+        // Get canvas for the page from viewer
+        const canvas = await this._getPageCanvas(pageNum);
+        console.log(`pdfed: Page ${pageNum} canvas:`, canvas ? `${canvas.width}x${canvas.height}` : 'null');
+        
+        if (!canvas) {
+          console.warn(`pdfed: Failed to get canvas for page ${pageNum}`);
+          continue;
+        }
+        
+        const result = await ocrService.processPage(canvas, pageNum);
+        console.log(`pdfed: OCR found ${result.words.length} words on page ${pageNum}`);
+        
+        if (result.words.length === 0) {
+          console.warn(`pdfed: No words found on page ${pageNum}`);
+          continue;
+        }
+        
+        // Create and render OCR text layer for this page
+        const pageContainer = this._getPageContainer(pageNum);
+        console.log(`pdfed: Page ${pageNum} container:`, pageContainer ? 'found' : 'NOT FOUND');
+        
+        if (!pageContainer) {
+          console.warn(`pdfed: Page container not found for page ${pageNum}`);
+          console.log(`pdfed: Available wrappers:`, this.pdfViewer?.container?.querySelectorAll('.pdfed-page-wrapper').length || 0);
+          continue;
+        }
+        
+        // Pass canvas dimensions for proper scale calculation
+        const textLayer = new OCRTextLayer(pageContainer, pageNum, this.pdfViewer.scale);
+        textLayer.render(result, canvas.width, canvas.height);
+        textLayer.enableEditing(); // Enable editing immediately
+        
+        // Store reference for later
+        if (!this.ocrTextLayers) this.ocrTextLayers = new Map();
+        this.ocrTextLayers.set(pageNum, textLayer);
+        console.log(`pdfed: Created OCRTextLayer for page ${pageNum}`);
+      }
+
+      // Success!
+      progressModal.showSuccess();
+      const processedCount = this.ocrTextLayers?.size || 0;
+      console.log(`pdfed: OCR processing completed. ${processedCount} pages now editable.`);
+      
+      // Notify user
+      setTimeout(() => {
+        alert(`OCR Complete! ${processedCount} scanned page(s) are now editable. Click on any word to edit.`);
+      }, 1600);
+
+    } catch (error) {
+      console.error("pdfed: OCR failed:", error);
+      progressModal.showError(error.message || "OCR processing failed");
+      setTimeout(() => progressModal.hide(), 3000);
+    }
+  }
+
+  /**
+   * Get canvas for a specific page (for OCR)
+   * @param {number} pageNum
+   * @returns {Promise<HTMLCanvasElement|null>}
+   */
+  async _getPageCanvas(pageNum) {
+    if (!this.pdfViewer) return null;
+
+    try {
+      const page = await this.pdfViewer.pdfDoc.getPage(pageNum);
+      const scale = this.pdfViewer.scale || 1.5;
+      const viewport = page.getViewport({ scale });
+
+      const canvas = document.createElement("canvas");
+      const ctx = canvas.getContext("2d");
+      canvas.width = viewport.width;
+      canvas.height = viewport.height;
+
+      await page.render({
+        canvasContext: ctx,
+        viewport: viewport
+      }).promise;
+
+      return canvas;
+    } catch (error) {
+      console.error(`pdfed: Failed to render page ${pageNum}:`, error);
+      return null;
+    }
+  }
+
+  /**
+   * Get the page container element for a specific page
+   * @param {number} pageNum
+   * @returns {HTMLElement|null}
+   */
+  _getPageContainer(pageNum) {
+    // Strategy 1: Look for our custom page wrappers (search entire document)
+    const allWrappers = document.querySelectorAll('.pdfed-page-wrapper');
+    console.log(`pdfed: Found ${allWrappers.length} page wrappers in document`);
+    
+    if (allWrappers.length > 0) {
+      const wrapper = allWrappers[pageNum - 1];
+      if (wrapper) {
+        console.log(`pdfed: Using page wrapper for page ${pageNum}`);
+        return wrapper;
+      }
+    }
+    
+    // Strategy 2: Look for Firefox PDF viewer page elements
+    const firefoxPage = document.querySelector(`.page[data-page-number="${pageNum}"]`);
+    if (firefoxPage) {
+      console.log(`pdfed: Using Firefox viewer page for page ${pageNum}`);
+      return firefoxPage;
+    }
+    
+    // Strategy 3: Find the canvas and use its parent
+    const canvas = document.querySelector(`.pdfed-page-canvas`);
+    if (canvas && canvas.parentElement) {
+      console.log(`pdfed: Using canvas parent for page ${pageNum}`);
+      return canvas.parentElement;
+    }
+    
+    console.warn(`pdfed: Could not find page container for page ${pageNum}, creating overlay`);
+    
+    // Strategy 4: Create a floating overlay (last resort)
+    let ocrOverlayContainer = document.getElementById('pdfed-ocr-overlay-container');
+    if (!ocrOverlayContainer) {
+      ocrOverlayContainer = document.createElement('div');
+      ocrOverlayContainer.id = 'pdfed-ocr-overlay-container';
+      Object.assign(ocrOverlayContainer.style, {
+        position: 'fixed',
+        top: '0',
+        left: '0',
+        width: '100%',
+        height: '100%',
+        pointerEvents: 'none',
+        zIndex: '1000',
+      });
+      document.body.appendChild(ocrOverlayContainer);
+    }
+    
+    let pageOverlay = ocrOverlayContainer.querySelector(`[data-ocr-page="${pageNum}"]`);
+    if (!pageOverlay) {
+      pageOverlay = document.createElement('div');
+      pageOverlay.dataset.ocrPage = pageNum;
+      Object.assign(pageOverlay.style, {
+        position: 'absolute',
+        top: '0',
+        left: '0',
+        width: '100%',
+        height: '100%',
+        pointerEvents: 'auto',
+      });
+      ocrOverlayContainer.appendChild(pageOverlay);
+    }
+    
+    return pageOverlay;
   }
 
   async _applyAnnotationToEngine(annotation) {

@@ -278,6 +278,68 @@ export class PDFEngine {
   }
 
   /**
+   * Add text annotation with background (for OCR text replacement)
+   * Draws a white rectangle first to cover original content, then draws new text
+   * @param {number} pageNum - Page number (1-indexed)
+   * @param {Object} config - Text configuration
+   */
+  async addTextAnnotation(pageNum, config) {
+    if (!this.pdfLibDoc) return;
+
+    const {
+      text,
+      x,
+      y,
+      width,
+      height,
+      fontSize = 12,
+      fontFamily = 'Helvetica',
+      color = { r: 0, g: 0, b: 0 },
+      backgroundColor = null
+    } = config;
+
+    const page = this.pdfLibDoc.getPage(pageNum - 1);
+    const pageHeight = page.getHeight();
+    const font = await this.pdfLibDoc.embedFont(StandardFonts.Helvetica);
+
+    // Convert to PDF coordinates (bottom-up)
+    const pdfY = pageHeight - y - height;
+
+    // Draw white background to cover original text
+    if (backgroundColor) {
+      page.drawRectangle({
+        x: x,
+        y: pdfY,
+        width: width,
+        height: height,
+        color: rgb(
+          backgroundColor.r / 255,
+          backgroundColor.g / 255,
+          backgroundColor.b / 255
+        ),
+        borderWidth: 0,
+      });
+    }
+
+    // Draw the new text
+    page.drawText(text, {
+      x: x + 2, // Small padding
+      y: pdfY + 2, // Position near bottom of box
+      size: fontSize,
+      font,
+      color: rgb(color.r, color.g, color.b),
+    });
+
+    this.annotations.push({
+      type: "ocrTextEdit",
+      pageNum,
+      config,
+    });
+
+    return true;
+  }
+
+  /**
    * Add image to a page
    * @param {number} pageNum - Page number
    * @param {Uint8Array} imageData - Image bytes
