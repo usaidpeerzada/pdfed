@@ -1701,6 +1701,17 @@ export class CanvasLayer {
     )
       return true;
 
+    // 3. Is it over any Modal? (Watermark, Header/Footer, Redact, Security, Signature, Stamp)
+    if (e.target.closest("#pdfed-watermark-modal")) return true;
+    if (e.target.closest("#pdfed-headfoot-modal")) return true;
+    if (e.target.closest("#pdfed-redact-modal")) return true;
+    if (e.target.closest("#pdfed-security-modal")) return true;
+    if (e.target.closest("#pdfed-signature-modal")) return true;
+    if (e.target.closest("#pdfed-stamp-modal")) return true;
+    if (e.target.closest(".pdfed-modal-overlay")) return true;
+    if (e.target.closest(".wm-panel")) return true;
+    if (e.target.closest(".hf-panel")) return true;
+
     // 4. Is it a Form Field? (Interactive Forms)
     if (e.target.closest(".pdfed-form-layer")) return true;
 
