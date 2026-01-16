@@ -1288,6 +1288,10 @@ export class Toolbar {
     }
 
     if (!isCmd) {
+      // Lock tool switching: only allow hotkeys when in 'select' mode
+      // User must explicitly click tool button or press Escape to switch
+      if (this.currentTool !== 'select') return;
+
       switch (e.key.toLowerCase()) {
         case "v":
           this._selectTool("select");
