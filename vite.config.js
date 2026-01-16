@@ -9,6 +9,7 @@ const browser = process.env.BROWSER || 'chrome';
 const copyFilesPlugin = {
   name: 'copy-extension-files',
   closeBundle() {
+
     const distDir = `dist/${browser}`;
     
     if (!existsSync(distDir)) {

@@ -17,7 +17,9 @@ class PDFEdContent {
     });
 
     if (this.detector.isPDFPage()) {
-      console.log('pdfed: PDF detected');
+      console.log('pdfed: PDF detected - auto-injecting toolbar');
+      // Auto-show toolbar on PDF pages for better UX
+      // setTimeout(() => this.showToolbar(), 500);
     }
   }
 
