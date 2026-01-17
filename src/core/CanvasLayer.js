@@ -1180,6 +1180,7 @@ export class CanvasLayer {
     }
 
     ctx.save();
+    ctx.beginPath();
     switch (annotation.type) {
       case "text":
         const data = annotation.data;
