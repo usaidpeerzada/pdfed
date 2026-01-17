@@ -547,7 +547,7 @@ export class Toolbar {
             <label>Color</label>
             <input type="color" value="${
               toolId === "highlight" ? "#ffff00" : "#000000"
-            }" id="pdfed-highlight-color" data-option="color">
+            }" id="pdfed-highlight-color" data-option="highlightColor">
           </div>
           <div class="pdfed-props">
             <label>Opacity</label>
@@ -799,9 +799,21 @@ export class Toolbar {
   async _applyAnnotationToEngine(annotation) {
     if (!this.engine || !annotation.pageNum) return;
 
+    // SCALING CRITICAL FIX:
+    // Canvas coordinates are in Screen Pixels (scaled by this.pdfViewer.scale, e.g. 1.5)
+    // PDFEngine expects PDF Points (unscaled, 72dpi).
+    // We MUST divide by scale to normalize.
+    const scale = this.pdfViewer ? this.pdfViewer.scale : 1;
+
     const { bounds, data, type, pageNum } = annotation;
     // Safety defaults
     const color = this._hexToRgb(data.color || "#000000");
+
+    // Normalize Bounds
+    const normX = bounds.x / scale;
+    const normY = bounds.y / scale;
+    const normW = bounds.width / scale;
+    const normH = bounds.height / scale;
 
     try {
       switch (type) {
@@ -809,10 +821,10 @@ export class Toolbar {
           await this.engine.addText(
             pageNum,
             data.text || "",
-            bounds.x,
-            bounds.y,
+            normX,
+            normY,
             {
-              size: data.fontSize || 16,
+              size: (data.fontSize || 16) / scale, // Normalize font size too
               color,
             }
           );
@@ -821,10 +833,10 @@ export class Toolbar {
         case "highlight":
           await this.engine.addRectangle(
             pageNum,
-            bounds.x,
-            bounds.y,
-            bounds.width,
-            bounds.height,
+            normX,
+            normY,
+            normW,
+            normH,
             {
               color,
               opacity: data.opacity || 0.3,
@@ -836,25 +848,25 @@ export class Toolbar {
         case "strikethrough":
           await this.engine.addLine(
             pageNum,
-            bounds.x,
-            bounds.y + bounds.height / 2,
-            bounds.x + bounds.width,
-            bounds.y + bounds.height / 2,
-            { color, thickness: 2 }
+            normX,
+            normY + normH / 2, // Midpoint relative to normalized box
+            normX + normW,
+            normY + normH / 2,
+            { color, thickness: 2 / scale }
           );
           break;
 
         case "shapes": // Rectangles
           await this.engine.addRectangle(
             pageNum,
-            bounds.x,
-            bounds.y,
-            bounds.width,
-            bounds.height,
+            normX,
+            normY,
+            normW,
+            normH,
             {
               color: { r: 0, g: 0, b: 0 }, // Transparent fill?
               borderColor: color,
-              borderWidth: data.strokeWidth || 2,
+              borderWidth: (data.strokeWidth || 2) / scale,
               opacity: 0, // No fill for shapes usually
             }
           );
@@ -863,10 +875,10 @@ export class Toolbar {
         case "redact":
           await this.engine.addRectangle(
             pageNum,
-            bounds.x,
-            bounds.y,
-            bounds.width,
-            bounds.height,
+            normX,
+            normY,
+            normW,
+            normH,
             {
               color: { r: 0, g: 0, b: 0 }, // Black
               opacity: 1,
@@ -879,11 +891,11 @@ export class Toolbar {
             for (let i = 0; i < data.points.length - 1; i++) {
               await this.engine.addLine(
                 pageNum,
-                data.points[i].x,
-                data.points[i].y,
-                data.points[i + 1].x,
-                data.points[i + 1].y,
-                { color, thickness: data.strokeWidth || 2 }
+                data.points[i].x / scale,
+                data.points[i].y / scale,
+                data.points[i + 1].x / scale,
+                data.points[i + 1].y / scale,
+                { color, thickness: (data.strokeWidth || 2) / scale }
               );
             }
           }
@@ -905,10 +917,10 @@ export class Toolbar {
               await this.engine.addImage(
                 pageNum,
                 bytes,
-                bounds.x,
-                bounds.y,
-                bounds.width,
-                bounds.height
+                normX,
+                normY,
+                normW,
+                normH
               );
             }
           }

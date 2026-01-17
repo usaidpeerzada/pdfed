@@ -257,9 +257,12 @@ export class PDFEngine {
 
     const { size = 16, color = { r: 0, g: 0, b: 0 } } = options;
 
+    // Fix: PDF-Lib draws from bottom-left (baseline), while Canvas uses top-left.
+    // To align visually, we must shift the PDF Y down by the font size.
+    // Fix: PDF-Lib draws from bottom-left (baseline). size * 0.75 better approximates Cap Height offset.
     page.drawText(text, {
       x,
-      y: page.getHeight() - y, // PDF coordinates are bottom-up
+      y: page.getHeight() - y - (size * 0.75), 
       size,
       font,
       color: rgb(color.r, color.g, color.b),
@@ -580,14 +583,25 @@ export class PDFEngine {
 
       if (position === "diagonal") {
         // Diagonal watermark across center
+        // Trigonometric centering:
+        // We want the CENTER of the rotated text to be at the page center.
+        // Rotation via drawText happens around the anchor (x,y).
+        // Anchor = Center - (RotatedVector to TextCenter)
+        // Vector is length w/2 along 45°.
+        
+        const angleRad = 45 * (Math.PI / 180);
+        const halfWidth = textWidth / 2;
+        const xOffset = halfWidth * Math.cos(angleRad);
+        const yOffset = halfWidth * Math.sin(angleRad);
+
         page.drawText(text, {
-          x: width / 2 - textWidth / 2,
-          y: height / 2,
+          x: width / 2 - xOffset,
+          y: height / 2 - yOffset,
           size: fontSize,
           font,
           color: rgb(r, g, b),
           opacity,
-          rotate: { type: "degrees", angle: -45 },
+          rotate: { type: "degrees", angle: 45 },
         });
       } else if (position === "tile") {
         // Tile pattern

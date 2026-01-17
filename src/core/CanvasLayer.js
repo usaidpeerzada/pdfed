@@ -928,6 +928,7 @@ export class CanvasLayer {
 
     switch (this.mode) {
       case "highlight":
+        ctx.globalCompositeOperation = "multiply";
         ctx.fillStyle = this._hexToRgba(
           this.options.highlightColor,
           this.options.opacity
@@ -1099,6 +1100,7 @@ export class CanvasLayer {
     const height = Math.abs(currentPoint.y - startPoint.y);
 
     if (this.mode === "highlight") {
+      ctx.globalCompositeOperation = "multiply";
       ctx.fillStyle = this._hexToRgba(
         this.options.highlightColor,
         this.options.opacity
@@ -1243,6 +1245,7 @@ export class CanvasLayer {
         });
         break;
       case "highlight":
+        ctx.globalCompositeOperation = "multiply";
         ctx.fillStyle = this._hexToRgba(
           annotation.data.color,
           annotation.data.opacity
