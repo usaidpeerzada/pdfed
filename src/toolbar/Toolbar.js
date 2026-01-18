@@ -350,6 +350,13 @@ export class Toolbar {
       }
     });
 
+    // Color pickers fire 'change' event, not 'input'
+    toolbar.addEventListener("change", (e) => {
+      if (e.target.tagName === "INPUT" && e.target.type === "color") {
+        this._handlePropertyChange(e);
+      }
+    });
+
     closeBtn.addEventListener("click", () => {
       // 1. Destroy all child components
       if (this.pdfViewer) this.pdfViewer.destroy();
@@ -438,6 +445,7 @@ export class Toolbar {
 
   // ============ Tool Selection ============
   _selectTool(toolId) {
+    console.log("pdfed: Tool selected -", toolId);
     // Actions
     switch (toolId) {
       case "undo":
@@ -562,7 +570,7 @@ export class Toolbar {
           </div>
           <div class="pdfed-props">
             <label>Color</label>
-            <input type="color" value="#000000" id="pdfed-stroke-color" data-option="color">
+            <input type="color" value="#000000" id="pdfed-stroke-color" data-option="drawColor">
           </div>
         `;
       case "shapes":
@@ -573,7 +581,7 @@ export class Toolbar {
           </div>
           <div class="pdfed-props">
             <label>Color</label>
-            <input type="color" value="#000000" id="pdfed-shape-color" data-option="color">
+            <input type="color" value="#000000" id="pdfed-shape-color" data-option="shapeColor">
           </div>
         `;
       default:

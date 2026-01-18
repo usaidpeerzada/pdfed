@@ -24,10 +24,12 @@ export class CanvasLayer {
     this.activePage = 1;
     this.isMultiPage = false;
 
-    // Tool options
+    // Tool options - SEPARATE colors per tool to prevent state leakage
     this.options = {
-      color: "#000000",
-      highlightColor: "#ffff00",
+      color: "#000000",           // Generic fallback / text color
+      drawColor: "#000000",       // Pen/Draw tool color
+      shapeColor: "#000000",      // Shapes tool color
+      highlightColor: "#ffff00",  // Highlight tool color
       strokeWidth: 2,
       fontSize: 16,
       opacity: 0.5,
@@ -1121,7 +1123,7 @@ export class CanvasLayer {
 
   _drawFreehandPreview(ctx) {
     if (this.pathPoints.length < 2 || !ctx) return;
-    ctx.strokeStyle = this.options.color;
+    ctx.strokeStyle = this.options.drawColor;
     ctx.lineWidth = this.options.strokeWidth;
     ctx.lineCap = "round";
     ctx.lineJoin = "round";
@@ -1158,7 +1160,7 @@ export class CanvasLayer {
       ctx.setLineDash([]);
     } else {
       // Regular shapes
-      ctx.strokeStyle = this.options.color;
+      ctx.strokeStyle = this.options.shapeColor;
       ctx.lineWidth = this.options.strokeWidth;
       ctx.strokeRect(x, y, width, height);
     }
@@ -1247,7 +1249,7 @@ export class CanvasLayer {
       case "highlight":
         ctx.globalCompositeOperation = "multiply";
         ctx.fillStyle = this._hexToRgba(
-          annotation.data.color,
+          annotation.data.highlightColor,
           annotation.data.opacity
         );
         ctx.fillRect(
@@ -1512,7 +1514,7 @@ export class CanvasLayer {
           bounds: this._calculatePathBounds(),
           data: {
             points: [...this.pathPoints],
-            color: this.options.color,
+            color: this.options.drawColor,
             strokeWidth: this.options.strokeWidth,
           },
         };
@@ -1523,7 +1525,7 @@ export class CanvasLayer {
           type: "shapes",
           bounds: { x, y, width, height },
           data: {
-            color: this.options.color,
+            color: this.options.shapeColor,
             strokeWidth: this.options.strokeWidth,
           },
         };
